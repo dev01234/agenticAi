@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio AI Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 700px;
+        }
+        .message-box {
+            background-color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            min-height: 50px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #cbd5e1;
+        }
+        .chat-area {
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 250px;
+            max-height: 400px;
+            overflow-y: auto;
+            background-color: #f8fafc;
+        }
+        .chat-message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            max-width: 85%;
+        }
+        .user-message {
+            background-color: #2563eb;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+        .bot-message {
+            background-color: #dbeafe;
+            color: #1e3a8a;
+            text-align: left;
+        }
+        .error-message {
+            color: #ef4444;
+            background-color: #fee2e2;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border: 1px solid #fca5a5;
+        }
+        .loading-spinner {
+            display: none; /* Hidden by default */
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #2563eb;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Markdown specific styles */
+        .bot-message p {
+            margin-bottom: 0.5em;
+        }
+        .bot-message ul {
+            list-style-type: disc;
+            margin-left: 20px;
+            margin-bottom: 0.5em;
+        }
+        .bot-message ol {
+            list-style-type: decimal;
+            margin-left: 20px;
+            margin-bottom: 0.5em;
+        }
+        .bot-message h1, .bot-message h2, .bot-message h3, .bot-message h4, .bot-message h5, .bot-message h6 {
+            font-weight: bold;
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+        }
+        .bot-message h1 { font-size: 2em; }
+        .bot-message h2 { font-size: 1.5em; }
+        .bot-message h3 { font-size: 1.17em; }
+        .bot-message h4 { font-size: 1em; }
+        .bot-message h5 { font-size: 0.83em; }
+        .bot-message h6 { font-size: 0.67em; }
+        .bot-message a {
+            color: #2563eb;
+            text-decoration: underline;
+        }
+
+        /* Styles for the DataFrame table */
+        .dataframe-container {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+
+        .dataframe-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            text-align: left;
+        }
+
+        .dataframe-table th, .dataframe-table td {
+            padding: 10px 15px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .dataframe-table th {
+            background-color: #f1f5f9;
+            font-weight: 600;
+            color: #475569;
+            position: sticky;
+            top: 0;
+        }
+        
+        .dataframe-table tbody tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        .dataframe-table tbody tr:hover {
+            background-color: #e2e8f0;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Portfolio AI Chat</h1>
+
+        <div id="upload-section" class="bg-blue-50 p-6 rounded-lg shadow-inner mb-6">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">Upload Your Portfolio (CSV/XLSX)</h2>
+            <input type="file" id="portfolioFile" accept=".csv, .xlsx" class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+            <button id="uploadButton" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition duration-150 ease-in-out">
+                Upload & Start Chat
+            </button>
+            <p id="uploadMessage" class="mt-3 text-sm text-center"></p>
+            <div id="uploadSpinner" class="loading-spinner"></div>
+            
+            <div id="dataframeDisplay" class="hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mt-6 mb-3">Loaded Portfolio Data (Preview)</h3>
+                <div class="dataframe-container">
+                    <table id="dataframeTable" class="dataframe-table">
+                        </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="chat-section" class="hidden">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">AI Chat Assistant</h2>
+
+            <div class="message-box text-gray-700" id="initialQuestions">
+                Awaiting initial questions...
+            </div>
+
+            <div class="chat-area mb-4" id="chatArea">
+                </div>
+
+            <div id="chatSpinner" class="loading-spinner"></div>
+
+            <div class="flex gap-2">
+                <input type="text" id="chatInput" placeholder="Ask your question about the portfolio..." class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm">
+                <button id="sendButton" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-150 ease-in-out">
+                    Send
+                </button>
+            </div>
+            <p id="chatStatus" class="mt-3 text-sm text-center text-gray-600"></p>
+        </div>
+    </div>
+
+    <script>
+        const uploadFile = document.getElementById('portfolioFile');
+        const uploadButton = document.getElementById('uploadButton');
+        const uploadMessage = document.getElementById('uploadMessage');
+        const uploadSpinner = document.getElementById('uploadSpinner');
+        const uploadSection = document.getElementById('upload-section');
+        const chatSection = document.getElementById('chat-section');
+        const initialQuestionsDiv = document.getElementById('initialQuestions');
+        const chatArea = document.getElementById('chatArea');
+        const chatInput = document.getElementById('chatInput');
+        const sendButton = document.getElementById('sendButton');
+        const chatStatus = document.getElementById('chatStatus');
+        const chatSpinner = document.getElementById('chatSpinner');
+        const dataframeDisplay = document.getElementById('dataframeDisplay');
+        const dataframeTable = document.getElementById('dataframeTable');
+
+        let ws = null;
+        let sessionId = null;
+
+        // Event listener to parse and display the file when selected
+        uploadFile.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                dataframeDisplay.classList.remove('hidden');
+                displayFileAsDataFrame(file);
+            } else {
+                dataframeDisplay.classList.add('hidden');
+                dataframeTable.innerHTML = '';
+            }
+        });
+
+        uploadButton.addEventListener('click', async () => {
+            const file = uploadFile.files[0];
+            if (!file) {
+                uploadMessage.textContent = 'Please select a file to upload.';
+                uploadMessage.className = 'mt-3 text-sm text-center text-red-500';
+                return;
+            }
+
+            uploadMessage.textContent = '';
+            uploadSpinner.style.display = 'block';
+            uploadButton.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('http://localhost:8000/api/upload_portfolio', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    sessionId = data.session_id;
+                    uploadMessage.textContent = data.message;
+                    uploadMessage.className = 'mt-3 text-sm text-center text-green-600';
+                    console.log('Session ID:', sessionId);
+                    uploadSection.classList.add('hidden');
+                    chatSection.classList.remove('hidden');
+                    connectWebSocket(sessionId);
+                } else {
+                    uploadMessage.textContent = `Error: ${data.detail || 'Unknown error'}`;
+                    uploadMessage.className = 'mt-3 text-sm text-center text-red-500';
+                }
+            } catch (error) {
+                uploadMessage.textContent = `Network error: ${error.message}`;
+                uploadMessage.className = 'mt-3 text-sm text-center text-red-500';
+                console.error('Upload error:', error);
+            } finally {
+                uploadSpinner.style.display = 'none';
+                uploadButton.disabled = false;
+            }
+        });
+
+        function displayFileAsDataFrame(file) {
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const data = e.target.result;
+                let parsedData = [];
+                let headers = [];
+                let isXLSX = file.name.endsWith('.xlsx');
+
+                if (isXLSX) {
+                    // Parse XLSX file
+                    const workbook = XLSX.read(data, { type: 'binary' });
+                    const sheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[sheetName];
+                    parsedData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                    if (parsedData.length > 0) {
+                        headers = parsedData[0];
+                        parsedData = parsedData.slice(1);
+                    }
+                } else {
+                    // Parse CSV file
+                    Papa.parse(file, {
+                        complete: function(results) {
+                            if (results.data.length > 0) {
+                                headers = results.data[0];
+                                parsedData = results.data.slice(1);
+                            }
+                            renderTable(headers, parsedData);
+                        },
+                        header: false, // Don't use first row as headers, we handle it
+                        skipEmptyLines: true
+                    });
+                    return; // Exit here for PapaParse async
+                }
+                
+                renderTable(headers, parsedData);
+            };
+
+            if (file.name.endsWith('.xlsx')) {
+                reader.readAsBinaryString(file);
+            } else {
+                reader.readAsText(file);
+            }
+        }
+
+        function renderTable(headers, data) {
+            let tableHTML = '<thead><tr>';
+            headers.forEach(header => {
+                tableHTML += `<th>${escapeHtml(String(header))}</th>`;
+            });
+            tableHTML += '</tr></thead><tbody>';
+
+            // Limit to a reasonable number of rows for preview
+            const rowsToShow = Math.min(data.length, 10);
+
+            for (let i = 0; i < rowsToShow; i++) {
+                const row = data[i];
+                if (row && row.length > 0) {
+                    tableHTML += '<tr>';
+                    row.forEach(cell => {
+                        tableHTML += `<td>${escapeHtml(String(cell || ''))}</td>`;
+                    });
+                    tableHTML += '</tr>';
+                }
+            }
+            tableHTML += '</tbody>';
+
+            dataframeTable.innerHTML = tableHTML;
+        }
+        
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+
+        function markdownToHtml(markdown) {
+            // Convert headings (h1-h6) - very basic, matches only start of line
+            markdown = markdown.replace(/^###### (.*$)/gim, '<h6>$1</h6>');
+            markdown = markdown.replace(/^##### (.*$)/gim, '<h5>$1</h5>');
+            markdown = markdown.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
+            markdown = markdown.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+            markdown = markdown.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+            markdown = markdown.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+            // Convert bold (**text** or __text__)
+            markdown = markdown.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            markdown = markdown.replace(/__(.*?)__/g, '<strong>$1</strong>');
+
+            // Convert italics (*text* or _text_)
+            markdown = markdown.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            markdown = markdown.replace(/_(.*?)_/g, '<em>$1</em>');
+
+            // Convert links [text](url)
+            markdown = markdown.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+            // Convert unordered lists (* item or - item)
+            markdown = markdown.replace(/^\s*[\*-]\s+(.*)$/gim, '<li>$1</li>');
+            if (markdown.includes('<li>')) {
+                markdown = '<ul>' + markdown + '</ul>';
+            }
+
+            // Convert ordered lists (1. item)
+            markdown = markdown.replace(/^\s*\d+\.\s+(.*)$/gim, '<li>$1</li>');
+            if (markdown.includes('<li>')) {
+                markdown = '<ol>' + markdown + '</ol>';
+            }
+
+            // Convert newlines to <br> for simple line breaks
+            markdown = markdown.replace(/\n/g, '<br>');
+
+            return markdown;
+        }
+
+        function connectWebSocket(sId) {
+            ws = new WebSocket(`ws://localhost:8000/chat/${sId}`);
+
+            ws.onopen = (event) => {
+                chatStatus.textContent = 'Connected to chat.';
+                chatStatus.className = 'mt-3 text-sm text-center text-green-600';
+                console.log('WebSocket connection opened:', event);
+                sendButton.disabled = false;
+                chatInput.disabled = false;
+            };
+
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                chatSpinner.style.display = 'none';
+                sendButton.disabled = false;
+                chatInput.disabled = false;
+
+                if (message.type === 'error') {
+                    displayMessage(`Error: ${escapeHtml(message.message)}`, 'bot-message error-message');
+                    chatStatus.textContent = `Chat error: ${message.message}`;
+                    chatStatus.className = 'mt-3 text-sm text-center text-red-500';
+                } else if (message.questions) {
+                    initialQuestionsDiv.innerHTML = '<strong>Possible questions:</strong><br>' + message.questions.join('<br>');
+                } else if (message.type === 'Strategy') {
+                    const markdownContent = message.message;
+                    displayMessage(markdownContent, 'bot-message', true); // Pass true to indicate Markdown
+                } else {
+                    displayMessage(`Unknown message type: ${escapeHtml(JSON.stringify(message))}`, 'bot-message');
+                }
+                chatArea.scrollTop = chatArea.scrollHeight; // Scroll to bottom
+            };
+
+            ws.onclose = (event) => {
+                chatStatus.textContent = 'Disconnected from chat.';
+                chatStatus.className = 'mt-3 text-sm text-center text-red-500';
+                console.log('WebSocket connection closed:', event);
+                sendButton.disabled = true;
+                chatInput.disabled = true;
+                initialQuestionsDiv.textContent = 'Disconnected. Please refresh to upload a new portfolio.';
+            };
+
+            ws.onerror = (event) => {
+                chatStatus.textContent = 'WebSocket error occurred.';
+                chatStatus.className = 'mt-3 text-sm text-center text-red-500';
+                console.error('WebSocket error:', event);
+            };
+        }
+
+        sendButton.addEventListener('click', () => {
+            sendMessage();
+        });
+
+        chatInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        function sendMessage() {
+            const query = chatInput.value.trim();
+            if (query && ws && ws.readyState === WebSocket.OPEN) {
+                displayMessage(query, 'user-message'); // User messages are still plain text
+                ws.send(query);
+                chatInput.value = '';
+                chatSpinner.style.display = 'block';
+                sendButton.disabled = true;
+                chatInput.disabled = true;
+                chatArea.scrollTop = chatArea.scrollHeight; // Scroll to bottom
+            } else if (!ws || ws.readyState !== WebSocket.OPEN) {
+                chatStatus.textContent = 'WebSocket not connected. Please upload a file first.';
+                chatStatus.className = 'mt-3 text-sm text-center text-red-500';
+            }
+        }
+
+        // Modified displayMessage function to handle Markdown
+        function displayMessage(message, className, isMarkdown = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${className}`;
+
+            if (isMarkdown) {
+                messageDiv.innerHTML = markdownToHtml(message);
+            } else {
+                messageDiv.textContent = message;
+            }
+            chatArea.appendChild(messageDiv);
+        }
+    </script>
+</body>
+</html>
