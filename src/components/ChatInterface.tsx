@@ -3,6 +3,7 @@ import { Send, ArrowLeft, MessageCircle, Wifi, WifiOff } from 'lucide-react';
 import ChatMessage from './ChatMessage';
 import LoadingSpinner from './LoadingSpinner';
 import PredefinedQuestions from './PredefinedQuestions';
+import SuggestedQuestions from './SuggestedQuestions';
 import type { PortfolioData } from './PortfolioAIChat';
 
 interface Message {
@@ -27,6 +28,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ sessionId, portfolioData,
   const [initialQuestions, setInitialQuestions] = useState<string[]>([]);
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [showPredefinedQuestions, setShowPredefinedQuestions] = useState(true);
+  const [showSuggestedQuestions, setShowSuggestedQuestions] = useState(false);
   
   const wsRef = useRef<WebSocket | null>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null);
@@ -111,6 +113,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ sessionId, portfolioData,
     setInputValue('');
     setIsLoading(true);
     setShowPredefinedQuestions(false);
+    setShowSuggestedQuestions(true);
   };
 
   const handleKeyPress = (event: React.KeyboardEvent) => {
@@ -163,6 +166,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ sessionId, portfolioData,
         <PredefinedQuestions 
           portfolioData={portfolioData}
           onSubmit={handlePredefinedQuestionSubmit}
+        />
+      )}
+
+      {/* Suggested Questions - shown after first interaction */}
+      {showSuggestedQuestions && !showPredefinedQuestions && messages.length > 0 && (
+        <SuggestedQuestions 
+          portfolioData={portfolioData}
+          onQuestionClick={handleQuestionClick}
         />
       )}
 
