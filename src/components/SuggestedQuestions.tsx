@@ -1,5 +1,5 @@
-import React from 'react';
-import { MessageCircle, Filter, DollarSign, Zap, Building, MapPin, Eye } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { MessageCircle, Filter, DollarSign, Zap, Building, Eye, ChevronDown, Send } from 'lucide-react';
 import type { PortfolioData } from './PortfolioAIChat';
 
 interface SuggestedQuestionsProps {
@@ -8,8 +8,15 @@ interface SuggestedQuestionsProps {
 }
 
 const SuggestedQuestions: React.FC<SuggestedQuestionsProps> = ({ portfolioData, onQuestionClick }) => {
-  // Extract locations from portfolio data for dynamic questions
-  const getAvailableLocations = () => {
+  const [availableLocations, setAvailableLocations] = useState<string[]>([]);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    extractLocations();
+  }, [portfolioData]);
+
+  const extractLocations = () => {
     const { headers, data } = portfolioData;
     
     const locationColumnNames = [
@@ -39,10 +46,26 @@ const SuggestedQuestions: React.FC<SuggestedQuestionsProps> = ({ portfolioData, 
       }
     });
     
-    return Array.from(locations).sort().slice(0, 5); // Show top 5 locations
+    setAvailableLocations(Array.from(locations).sort());
   };
 
-  const availableLocations = getAvailableLocations();
+  const handleLocationToggle = (location: string) => {
+    setSelectedLocations(prev => 
+      prev.includes(location)
+        ? prev.filter(loc => loc !== location)
+        : [...prev, location]
+    );
+  };
+
+  const handleLocationQuestionSubmit = () => {
+    if (selectedLocations.length > 0) {
+      const locationList = selectedLocations.join(', ');
+      const question = `What would be the top Scenarios if we were not to keep/exit these locations: ${locationList}`;
+      onQuestionClick(question);
+      setSelectedLocations([]);
+      setIsLocationDropdownOpen(false);
+    }
+  };
 
   const generalQuestions = [
     {
@@ -130,31 +153,91 @@ const SuggestedQuestions: React.FC<SuggestedQuestionsProps> = ({ portfolioData, 
               </span>
             </button>
           ))}
-
-          {/* Dynamic location-specific questions */}
-          {availableLocations.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mt-4 mb-2">
-                Specific Location Analysis
-              </p>
-              {availableLocations.map((location, index) => (
-                <button
-                  key={index}
-                  onClick={() => onQuestionClick(`What would be the top Scenarios if we were not to keep/exit ${location}?`)}
-                  className="flex items-center p-3 bg-white hover:bg-forest-50 border border-forest-200 rounded-lg transition-all duration-200 hover:border-forest-300 hover:shadow-sm text-left group w-full"
-                >
-                  <div className="w-8 h-8 bg-gradient-to-r from-forest-400 to-forest-500 rounded-lg flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
-                    <MapPin className="w-4 h-4 text-white" />
-                  </div>
-                  <span className="text-xs text-gray-700 group-hover:text-forest-800 font-medium">
-                    Analysis without <span className="font-semibold text-forest-700">{location}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Location Selection Question */}
+      {availableLocations.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+            Specific Location Analysis
+          </h4>
+          <div className="bg-white border border-forest-200 rounded-lg p-4 space-y-4">
+            <p className="text-sm font-medium text-gray-700">
+              What would be the top Scenarios if we were not to keep/exit specific locations?
+            </p>
+            
+            {/* Location Multi-Select Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setIsLocationDropdownOpen(!isLocationDropdownOpen)}
+                className="w-full bg-white border border-forest-300 rounded-lg px-4 py-3 text-left flex items-center justify-between hover:border-forest-400 focus:ring-2 focus:ring-forest-500 focus:border-forest-500"
+              >
+                <span className="text-gray-700">
+                  {selectedLocations.length === 0 
+                    ? 'Select locations to analyze...' 
+                    : `${selectedLocations.length} location(s) selected`
+                  }
+                </span>
+                <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isLocationDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {isLocationDropdownOpen && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-forest-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {availableLocations.map((location) => (
+                    <label
+                      key={location}
+                      className="flex items-center px-4 py-3 hover:bg-forest-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedLocations.includes(location)}
+                        onChange={() => handleLocationToggle(location)}
+                        className="w-4 h-4 text-forest-600 border-gray-300 rounded focus:ring-forest-500"
+                      />
+                      <span className="ml-3 text-sm text-gray-700">{location}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Selected Locations Display */}
+            {selectedLocations.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {selectedLocations.map((location) => (
+                  <span
+                    key={location}
+                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-forest-100 text-forest-800"
+                  >
+                    {location}
+                    <button
+                      onClick={() => handleLocationToggle(location)}
+                      className="ml-2 text-forest-600 hover:text-forest-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            
+            {/* Submit Button */}
+            <button
+              onClick={handleLocationQuestionSubmit}
+              disabled={selectedLocations.length === 0}
+              className={`w-full py-2 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2 ${
+                selectedLocations.length > 0
+                  ? 'bg-gradient-to-r from-forest-700 to-forest-800 hover:from-forest-800 hover:to-forest-900 text-white shadow-md hover:shadow-lg'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              <Send className="w-4 h-4" />
+              <span>Ask About Selected Locations</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="pt-4 border-t border-forest-200">
         <p className="text-xs text-gray-500 text-center">
